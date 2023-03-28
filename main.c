@@ -7,7 +7,7 @@
 #define MAPX 8
 #define MAPY 8
 #define DELAY 6
-#define RAYS 80
+#define RAYS 800
 #define FOV PI / 2
 struct Mvsqr {
 	float x, y, deltaX, deltaY, angle, width;
@@ -33,7 +33,7 @@ void checkAngleLimits(float *angle) {
 		*angle -= 2 * PI;
 	}
 }
-void horizontalRay(mvsqr player, float rayAngle, int map[], float *rayHX, float *rayHY, float *hLen) {
+void horizontalRay(mvsqr player, float rayAngle, int map[], float *rayHX, float *rayHY, float *hLen, int *hColor) {
 	int dof = 1;
 	int mapLineSpacing = HEIGHT / MAPY;
 	int playerLine = player.y / mapLineSpacing;
@@ -64,13 +64,14 @@ void horizontalRay(mvsqr player, float rayAngle, int map[], float *rayHX, float 
 		if (rayMapPos >= MAPX * MAPY - 1 || rayMapPos < 0) {
 			break;
 		}
-		if (map[rayMapPos] == 1) {
+		if (map[rayMapPos] != 0) {
+			*hColor = map[rayMapPos];
 			break;
 		}
 		dof++;
 	}
 }
-void verticalRay(mvsqr player, float rayAngle, int map[], float *rayVX, float *rayVY, float *vLen) {
+void verticalRay(mvsqr player, float rayAngle, int map[], float *rayVX, float *rayVY, float *vLen, int *vColor) {
 	int dof = 1;
 	int mapLineSpacing = (WIDTH / 2) / MAPX;
 	int playerLine = player.x / mapLineSpacing;
@@ -101,7 +102,8 @@ void verticalRay(mvsqr player, float rayAngle, int map[], float *rayVX, float *r
 		if (rayMapPos >= MAPX * MAPY - 1 || rayMapPos < 0) {
 			break;
 		}
-		if (map[rayMapPos] == 1) {
+		if (map[rayMapPos] != 0) {
+			*vColor = map[rayMapPos];
 			break;
 		}
 		dof++;
@@ -109,20 +111,34 @@ void verticalRay(mvsqr player, float rayAngle, int map[], float *rayVX, float *r
 }
 void drawRays(SDL_Renderer *renderer, mvsqr player, int map[]) {
 	float rayAngle = player.angle - FOV / 2.0;
-	float rayVX, rayVY, vLen, rayHX, rayHY, hLen, shortLen;
+	float rayVX, rayVY, vLen, rayHX, rayHY, hLen, shortLen, shade;
+	int vColor, hColor, shortColor;
 	for (int i = 0; i < RAYS; i++) {
 		checkAngleLimits(&rayAngle);
-		verticalRay(player, rayAngle, map, &rayVX, &rayVY, &vLen);
-		horizontalRay(player, rayAngle, map, &rayHX, &rayHY, &hLen);
-		SDL_SetRenderDrawColor(renderer, 0, 255, 0, SDL_ALPHA_OPAQUE);
+		verticalRay(player, rayAngle, map, &rayVX, &rayVY, &vLen, &vColor);
+		horizontalRay(player, rayAngle, map, &rayHX, &rayHY, &hLen, &hColor);
+		SDL_SetRenderDrawColor(renderer, 255, 255, 0, SDL_ALPHA_OPAQUE);
 		if (vLen < hLen) {
 			SDL_RenderDrawLine(renderer, player.x, player.y, rayVX, rayVY);
 			shortLen = vLen;
-			SDL_SetRenderDrawColor(renderer, 150, 0, 150, SDL_ALPHA_OPAQUE); // Shade vertical walls
+			shortColor = vColor;
+			shade = 1;
 		} else {
 			SDL_RenderDrawLine(renderer, player.x, player.y, rayHX, rayHY);
 			shortLen = hLen;
-			SDL_SetRenderDrawColor(renderer, 255, 0, 255, SDL_ALPHA_OPAQUE);
+			shortColor = hColor;
+			shade = 0.6;
+		}
+		switch (shortColor) {
+		case 1:
+			SDL_SetRenderDrawColor(renderer, 255 * shade, 0, 255 * shade, SDL_ALPHA_OPAQUE);
+			break;
+		case 2:
+			SDL_SetRenderDrawColor(renderer, 0, 0, 255 * shade, SDL_ALPHA_OPAQUE);
+			break;
+		case 3:
+			SDL_SetRenderDrawColor(renderer, 0, 255 * shade, 0, SDL_ALPHA_OPAQUE);
+			break;
 		}
 
 		// Fix fisheye effect
@@ -163,10 +179,19 @@ void draw2DBackground(SDL_Renderer *renderer, int map[]) {
 			rect.y = y * (HEIGHT / MAPY);
 			rect.w = ((WIDTH / 2) / MAPX) - 2;
 			rect.h = (HEIGHT / MAPY) - 2;
-			if (map[y * MAPX + x] == 1) {
-				SDL_SetRenderDrawColor(renderer, 255, 0, 255, SDL_ALPHA_OPAQUE);
-			} else if (map[y * MAPX + x] == 0) {
+			switch (map[y * MAPX + x]) {
+			case 0:
 				SDL_SetRenderDrawColor(renderer, 0, 51, 0, SDL_ALPHA_OPAQUE);
+				break;
+			case 1:
+				SDL_SetRenderDrawColor(renderer, 255, 0, 255, SDL_ALPHA_OPAQUE);
+				break;
+			case 2:
+				SDL_SetRenderDrawColor(renderer, 0, 0, 255, SDL_ALPHA_OPAQUE);
+				break;
+			case 3:
+				SDL_SetRenderDrawColor(renderer, 0, 255, 0, SDL_ALPHA_OPAQUE);
+				break;
 			}
 			SDL_RenderFillRect(renderer, &rect);
 		}
@@ -222,13 +247,14 @@ int isMouseEvent(void *userdata, SDL_Event *event) { // Remove mouse movement fr
 	return event->type != SDL_MOUSEMOTION;
 }
 int main(int argc, char *argv[]) {
+	// 1->Pink, 2->Blue, 3->Green
 	int map[MAPY * MAPX] = {
 		1, 1, 1, 1, 1, 1, 1, 1,
 		1, 0, 0, 0, 0, 0, 0, 1,
-		1, 0, 0, 1, 0, 0, 0, 1,
+		1, 0, 0, 0, 2, 0, 0, 1,
 		1, 0, 0, 0, 0, 0, 0, 1,
-		1, 0, 0, 0, 0, 1, 0, 1,
-		1, 0, 0, 0, 0, 1, 0, 1,
+		1, 0, 0, 0, 0, 3, 0, 1,
+		1, 0, 0, 2, 0, 0, 0, 1,
 		1, 0, 0, 0, 0, 0, 0, 1,
 		1, 1, 1, 1, 1, 1, 1, 1};
 	SDL_Window *window = NULL;
