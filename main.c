@@ -7,7 +7,7 @@
 #define MAPX 8
 #define MAPY 8
 #define DELAY 6
-#define RAYS 1
+#define RAYS 80
 #define FOV PI / 2
 struct Mvsqr {
 	float x, y, deltaX, deltaY, angle, width;
