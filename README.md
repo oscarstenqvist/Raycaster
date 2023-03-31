@@ -1,6 +1,6 @@
 # RayCaster
 
-![ExampleGif](ExampleVid.gif)
+![ExampleGif](raygif.gif)
 
 By casting several rays within a field of view a 3D image can be created. This is done by creating a rectangle for each ray with a center point at the horizontal line. The rectangle increase and decrease in height depending on how long the ray is.
 
